@@ -281,7 +281,7 @@ function M.send_to_tmux(content, comment_count, target, silent)
             return
         end
 
-        vim.system({ "tmux", "paste-buffer", "-t", target }, {}, function(paste_result)
+        vim.system({ "tmux", "paste-buffer", "-p", "-t", target }, {}, function(paste_result)
             vim.schedule(function()
                 os.remove(tmpfile)
 
@@ -296,7 +296,9 @@ function M.send_to_tmux(content, comment_count, target, silent)
                 end
 
                 if cfg.tmux.auto_enter then
-                    vim.system({ "tmux", "send-keys", "-t", target, "Enter" })
+                    vim.defer_fn(function()
+                        vim.system({ "tmux", "send-keys", "-t", target, "Enter" })
+                    end, 100)
                 end
 
                 if not silent then
