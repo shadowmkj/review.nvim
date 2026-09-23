@@ -107,4 +107,15 @@ T["adjacent panel getter with single panel navigates to diff view on next"] = fu
     expect.equality(layout.get_adjacent_panel_getter("file_tree", "prev"), "get_file_tree")
 end
 
+T["shared panel keymaps include the sidebar toggle"] = function()
+    local bufnr = vim.api.nvim_create_buf(false, true)
+    local lhs_list = {}
+    panel_keymaps.setup(bufnr, { panel_name = "branch_list" }, function() end, {}, function(lhs)
+        table.insert(lhs_list, lhs)
+    end)
+    vim.api.nvim_buf_delete(bufnr, { force = true })
+
+    expect.equality(vim.tbl_contains(lhs_list, "<C-n>"), true)
+end
+
 return T

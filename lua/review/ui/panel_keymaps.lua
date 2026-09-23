@@ -85,6 +85,10 @@ function M.setup(bufnr, navigation, on_close, active_timers, map_function, on_es
         require("review.ui.push").push()
     end, { nowait = true, desc = "Push to remote", group = group })
 
+    map_function("<C-n>", function()
+        require("review.ui").toggle_file_tree()
+    end, { desc = "Toggle file tree", group = "View" })
+
     map_function("<Tab>", function()
         local layout = require("review.ui.layout")
         local target = layout.get_adjacent_panel_getter(navigation.panel_name, "next")

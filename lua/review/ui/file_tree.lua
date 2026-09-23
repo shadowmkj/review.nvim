@@ -1704,12 +1704,6 @@ local function setup_keymaps(bufnr, callbacks)
         refresh_and_sync()
     end, { desc = "Toggle list/tree view", group = "View" })
 
-    -- Toggle file tree
-    map("<C-n>", function()
-        local ui = require("review.ui")
-        ui.toggle_file_tree()
-    end, { desc = "Toggle file tree", group = "View" })
-
     -- Toggle split/unified diff
     map("S", function()
         local diff_view = require("review.ui.diff_view")
