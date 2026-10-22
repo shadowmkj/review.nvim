@@ -272,6 +272,62 @@ T["send passes content, count, target, and silent to export.send_to_default when
     expect.equality(type(captured.on_done), "function")
 end
 
+T["send uses quick_comments.target when target argument is nil"] = function()
+    config.setup({
+        export = { on_export = nil },
+        quick_comments = { target = "agy" },
+    })
+
+    qc_state.add("/project/src/main.lua", 10, "note", "QC target comment")
+
+    local export = require("review.export.markdown")
+    local original_send_to_default = export.send_to_default
+    local captured_target = nil
+
+    export.send_to_default = function(_, _, target)
+        captured_target = target
+        return true
+    end
+
+    local ok, result = pcall(qc.send, nil, { silent = true })
+    export.send_to_default = original_send_to_default
+
+    if not ok then
+        error(result)
+    end
+
+    expect.equality(result, true)
+    expect.equality(captured_target, "agy")
+end
+
+T["send falls back to tmux.target when target argument and quick_comments.target are nil"] = function()
+    config.setup({
+        export = { on_export = nil },
+        tmux = { target = "agy" },
+    })
+
+    qc_state.add("/project/src/main.lua", 10, "note", "Tmux fallback comment")
+
+    local export = require("review.export.markdown")
+    local original_send_to_default = export.send_to_default
+    local captured_target = nil
+
+    export.send_to_default = function(_, _, target)
+        captured_target = target
+        return true
+    end
+
+    local ok, result = pcall(qc.send, nil, { silent = true })
+    export.send_to_default = original_send_to_default
+
+    if not ok then
+        error(result)
+    end
+
+    expect.equality(result, true)
+    expect.equality(captured_target, "agy")
+end
+
 T[":Review qs <target> passes target argument to send_to_default"] = function()
     config.setup({
         export = {

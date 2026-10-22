@@ -207,6 +207,18 @@ function M.send(target, opts)
     local content = markdown.build(comments)
     local export = require("review.export.markdown")
 
+    local cfg = config.get()
+    local resolved_target = target or (cfg.quick_comments and cfg.quick_comments.target)
+    if not resolved_target then
+        if export.inside_herdr() then
+            if cfg.tmux and cfg.tmux.target and cfg.tmux.target ~= "!" then
+                resolved_target = cfg.tmux.target
+            end
+        else
+            resolved_target = cfg.tmux and cfg.tmux.target
+        end
+    end
+
     local function handle_done(ok)
         if ok and opts.clear then
             clear_quick_comments()
@@ -222,7 +234,7 @@ function M.send(target, opts)
         return success
     end
 
-    return export.send_to_default(content, #comments, target, opts.silent, handle_done)
+    return export.send_to_default(content, #comments, resolved_target, opts.silent, handle_done)
 end
 
 ---Set up the quick comments feature

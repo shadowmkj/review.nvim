@@ -354,4 +354,113 @@ T["parse_agents skips entries without pane_id"] = function()
     expect.equality(agents[1].pane_id, "a:b")
 end
 
+local SAMPLE_PANES = table.concat({
+    "%23\treview.nvim\tnvim\tv ~/review.nvim\tnvim\t0\t1\t0",
+    "%24\treview.nvim\tagy\tagy\tagy\t1\t1\t0",
+    "%25\treview.nvim\tfish\t~/review.nvim\tfish\t0\t1\t0",
+    "%0\ttorch-rs\tnvim\tv ~/torch-rs\tnvim\t0\t1\t1",
+    "%10\ttorch-rs\tagy\tagyc ~/torch-rs\tagy\t1\t1\t1",
+    "%12\ttorch-rs\tagy\tagyc ~/.config\tagy\t0\t1\t1",
+    "%21\ttorch-rs\tfish\t~/torch-rs\tfish\t0\t1\t1",
+}, "\n")
+
+T["find_matching_pane_id preserves special tmux tokens"] = function()
+    expect.equality(markdown.find_matching_pane_id("!", SAMPLE_PANES, "%23"), "!")
+    expect.equality(markdown.find_matching_pane_id("+", SAMPLE_PANES, "%23"), "+")
+    expect.equality(markdown.find_matching_pane_id("-", SAMPLE_PANES, "%23"), "-")
+    expect.equality(markdown.find_matching_pane_id("%42", SAMPLE_PANES, "%23"), "%42")
+    expect.equality(markdown.find_matching_pane_id("{last}", SAMPLE_PANES, "%23"), "{last}")
+end
+
+T["find_matching_pane_id matches pane by title in current session"] = function()
+    local panes = table.concat({
+        "%1\tmysess\tmain\tmy-editor\tnvim\t1\t1\t1",
+        "%2\tmysess\tworker\tagy\tpython\t0\t1\t1",
+    }, "\n")
+    expect.equality(markdown.find_matching_pane_id("agy", panes, "%1"), "%2")
+end
+
+T["find_matching_pane_id matches pane by window name in current session"] = function()
+    local panes = table.concat({
+        "%1\tmysess\tmain\teditor\tnvim\t1\t1\t1",
+        "%2\tmysess\tagy\tbash\tbash\t0\t1\t1",
+    }, "\n")
+    expect.equality(markdown.find_matching_pane_id("agy", panes, "%1"), "%2")
+end
+
+T["find_matching_pane_id matches pane by current command in current session"] = function()
+    local panes = table.concat({
+        "%1\tmysess\tmain\teditor\tnvim\t1\t1\t1",
+        "%2\tmysess\tterm\tbash\tagy\t0\t1\t1",
+    }, "\n")
+    expect.equality(markdown.find_matching_pane_id("agy", panes, "%1"), "%2")
+end
+
+T["find_matching_pane_id prefers current session over other sessions"] = function()
+    expect.equality(markdown.find_matching_pane_id("agy", SAMPLE_PANES, "%23"), "%24")
+end
+
+T["find_matching_pane_id supports session:target format"] = function()
+    expect.equality(markdown.find_matching_pane_id("torch-rs:agy", SAMPLE_PANES, "%23"), "%10")
+end
+
+T["find_matching_pane_id falls back to target when no match found"] = function()
+    expect.equality(markdown.find_matching_pane_id("nonexistent", SAMPLE_PANES, "%23"), "nonexistent")
+    expect.equality(markdown.find_matching_pane_id("agy", "", "%23"), "agy")
+    expect.equality(markdown.find_matching_pane_id("agy", nil, "%23"), "agy")
+end
+
+T["send_to_tmux resolves pane target before pasting"] = function()
+    local orig_tmux_env = vim.env.TMUX
+    local orig_pane_env = vim.env.TMUX_PANE
+    local orig_system = vim.system
+
+    vim.env.TMUX = "/tmp/tmux-501/default,1,1"
+    vim.env.TMUX_PANE = "%23"
+
+    local commands = {}
+    vim.system = function(cmd, _opts, on_exit)
+        table.insert(commands, cmd)
+        local result = { code = 0, signal = 0, stdout = "", stderr = "" }
+        if cmd[1] == "tmux" and cmd[2] == "list-panes" then
+            result.stdout = SAMPLE_PANES
+        end
+        if on_exit then
+            vim.schedule(function()
+                on_exit(result)
+            end)
+        end
+        return {
+            wait = function()
+                return result
+            end,
+        }
+    end
+
+    local done = false
+    markdown.send_to_tmux("content", 1, "agy", true, function(ok)
+        done = ok
+    end)
+
+    -- Wait for scheduled callbacks
+    vim.wait(1000, function()
+        return done
+    end)
+
+    vim.env.TMUX = orig_tmux_env
+    vim.env.TMUX_PANE = orig_pane_env
+    vim.system = orig_system
+
+    expect.equality(done, true)
+
+    local found_paste = false
+    for _, cmd in ipairs(commands) do
+        if cmd[1] == "tmux" and cmd[2] == "paste-buffer" then
+            found_paste = true
+            expect.equality(cmd[5], "%24")
+        end
+    end
+    expect.equality(found_paste, true)
+end
+
 return T

@@ -243,6 +243,154 @@ local function is_tmux()
     return vim.env.TMUX ~= nil
 end
 
+---Find matching tmux pane id for a target string
+---@param target string
+---@param raw_panes string|nil
+---@param current_pane_id string|nil
+---@return string resolved_target
+function M.find_matching_pane_id(target, raw_panes, current_pane_id)
+    if not target or target == "" then
+        return target
+    end
+
+    if target == "!" or target == "+" or target == "-" or target:match("^%%") or target:match("^{.*}$") then
+        return target
+    end
+
+    if not raw_panes or raw_panes == "" then
+        return target
+    end
+
+    local panes = {}
+    local current_session = nil
+
+    for line in raw_panes:gmatch("[^\r\n]+") do
+        local parts = vim.split(line, "\t", { plain = true })
+        if #parts >= 8 then
+            local pane_info = {
+                pane_id = parts[1],
+                session_name = parts[2],
+                window_name = parts[3],
+                pane_title = parts[4],
+                pane_current_command = parts[5],
+                window_active = parts[6] == "1",
+                pane_active = parts[7] == "1",
+                session_attached = parts[8] == "1",
+            }
+            table.insert(panes, pane_info)
+            if current_pane_id and pane_info.pane_id == current_pane_id then
+                current_session = pane_info.session_name
+            end
+        end
+    end
+
+    local target_session, target_name = target:match("^([^:]+):(.+)$")
+    if not target_session then
+        target_name = target
+    end
+
+    local best_pane = nil
+    local best_score = -1
+
+    for _, p in ipairs(panes) do
+        if target_session and p.session_name ~= target_session then
+            goto continue
+        end
+
+        local is_current = (current_session and p.session_name == current_session)
+        local match_type = nil
+
+        if p.pane_title == target_name then
+            match_type = 3
+        elseif p.window_name == target_name then
+            match_type = 2
+        elseif p.pane_current_command == target_name then
+            match_type = 1
+        end
+
+        if match_type then
+            local score = 0
+            if target_session and p.session_name == target_session then
+                score = score + 100000
+            end
+            if is_current then
+                score = score + 10000
+            end
+            score = score + match_type * 1000
+            if p.session_attached then
+                score = score + 100
+            end
+            if p.window_active then
+                score = score + 10
+            end
+            if p.pane_active then
+                score = score + 1
+            end
+
+            if score > best_score then
+                best_score = score
+                best_pane = p
+            end
+        end
+
+        ::continue::
+    end
+
+    if best_pane then
+        return best_pane.pane_id
+    end
+
+    return target
+end
+
+---Resolve tmux target name to pane_id if possible
+---@param target? string
+---@return string
+function M.resolve_tmux_target(target)
+    if
+        not target
+        or target == ""
+        or target == "!"
+        or target == "+"
+        or target == "-"
+        or target:match("^%%")
+        or target:match("^{.*}$")
+    then
+        return target or "!"
+    end
+
+    if not is_tmux() then
+        return target
+    end
+
+    local list_format = table.concat({
+        "#{pane_id}",
+        "#{session_name}",
+        "#{window_name}",
+        "#{pane_title}",
+        "#{pane_current_command}",
+        "#{window_active}",
+        "#{pane_active}",
+        "#{session_attached}",
+    }, "\t")
+
+    local ok, res = pcall(function()
+        return vim.system({
+            "tmux",
+            "list-panes",
+            "-a",
+            "-F",
+            list_format,
+        }):wait()
+    end)
+
+    if not ok or not res or res.code ~= 0 or not res.stdout then
+        return target
+    end
+
+    return M.find_matching_pane_id(target, res.stdout, vim.env.TMUX_PANE)
+end
+
 ---Send markdown content to a tmux pane
 ---@param content string Markdown content to send
 ---@param comment_count number Number of comments in content
@@ -263,6 +411,7 @@ function M.send_to_tmux(content, comment_count, target, silent, on_done)
 
     local cfg = require("review.config").get()
     target = target or cfg.tmux.target
+    local resolved_target = M.resolve_tmux_target(target)
 
     if comment_count == 0 then
         if not silent then
@@ -302,7 +451,7 @@ function M.send_to_tmux(content, comment_count, target, silent, on_done)
             return
         end
 
-        vim.system({ "tmux", "paste-buffer", "-p", "-t", target }, {}, function(paste_result)
+        vim.system({ "tmux", "paste-buffer", "-p", "-t", resolved_target }, {}, function(paste_result)
             vim.schedule(function()
                 os.remove(tmpfile)
 
@@ -321,7 +470,7 @@ function M.send_to_tmux(content, comment_count, target, silent, on_done)
 
                 if cfg.tmux.auto_enter then
                     vim.defer_fn(function()
-                        vim.system({ "tmux", "send-keys", "-t", target, "Enter" })
+                        vim.system({ "tmux", "send-keys", "-t", resolved_target, "Enter" })
                     end, 100)
                 end
 
@@ -546,8 +695,20 @@ end
 ---@param silent? boolean Suppress notifications
 ---@return boolean success
 function M.send(target, silent)
+    local cfg = require("review.config").get()
+    local resolved_target = target
+    if not resolved_target then
+        if M.inside_herdr() then
+            if cfg.tmux and cfg.tmux.target and cfg.tmux.target ~= "!" then
+                resolved_target = cfg.tmux.target
+            end
+        else
+            resolved_target = cfg.tmux and cfg.tmux.target
+        end
+    end
+
     if not M.has_handler() then
-        return M.send_to_default(M.generate(), #state.get_all_comments(), target, silent)
+        return M.send_to_default(M.generate(), #state.get_all_comments(), resolved_target, silent)
     end
 
     local comments = state.get_all_comments()

@@ -265,6 +265,7 @@ Submitting an empty input also discards the comment. The quick comment input has
 | `j` / `k` | Next / previous entry |
 | `<CR>` | Jump to the comment in the diff. On a directory in tree view: collapse/expand |
 | `d` | Delete the comment (confirms first) |
+| `s` | Send all comments to `export.on_export`, or to herdr/tmux |
 | `t` | Toggle flat / tree grouping |
 | `P` | Push to remote |
 | `<C-d>` / `<C-u>` | Scroll the **diff pane** down / up |
@@ -314,6 +315,7 @@ require("review").setup({
         auto_enter = false,
     },
     quick_comments = {
+        target = nil,
         keymaps = {
             add = nil,
             toggle_panel = nil,
@@ -362,9 +364,10 @@ The `nil` entries are unset by default. No global keymaps are created unless you
 - `ui.number_navigation`: enable `1`–`n` to focus the sidebar panels top to bottom and `0` to focus the diff. Disabled by default so normal-mode counts and `0` retain their usual behavior unless you opt in.
 - `ui.line_stats`: show `+added −deleted` line counts after each file in the Files panel, and the totals in its title. Enabled by default; set to `false` for a plain file list.
 - `ui.panels`: sidebar panels to display. Can be a list of panel names (e.g. `{ "file_tree", "comment_list" }` or `{ "files", "comments" }`) or a table of boolean toggles (e.g. `{ branch = false, branches = false, commits = false }`). Defaults to showing all panels (`branch_info`, `file_tree`, `branch_list`, `commit_list`, `comment_list`). Note that the Files panel (`file_tree`) cannot be disabled.
-- `tmux.target`: tmux target that `:Review send` and `:Review qs` paste into. The default `"!"` is tmux's last active pane, which is normally the pane you came from, usually the one running your agent. Any target `tmux paste-buffer -t` accepts works instead, e.g. a named window `"CLAUDE"`, `"CLAUDE.0"` or a fully qualified `"session:window.pane"`.
+- `tmux.target`: tmux target that `:Review send` and `:Review qs` paste into. The default `"!"` is tmux's last active pane, which is normally the pane you came from, usually the one running your agent. Named panes (by pane title, e.g. `"agy"`), named windows (e.g. `"agy"` or `"CLAUDE"`), running commands, pane IDs (`"%24"`), or fully qualified targets (`"session:window.pane"`) are automatically resolved and supported.
 - `tmux.auto_enter`: send `Enter` after pasting. Off by default so you can read the prompt before submitting it.
 - herdr: no config. Inside a herdr session `:Review send` and `:Review qs` list your herdr agents (`herdr agent list`) and let you pick one with `vim.ui.select` (shown as `agent:cwd`, e.g. `pi:/Users/me/Repos/review.nvim`). The markdown is sent with `herdr pane send-text` and no `Enter`, so the prompt lands in the agent's input for you to review before submitting.
+- `quick_comments.target`: optional tmux target specifically for quick comments (e.g. `"agy"`). Falls back to `tmux.target` when unset.
 - `quick_comments.keymaps.add` / `.toggle_panel` / `.send`: global keys for `:Review qc`, `:Review qp`, and `:Review qs`.
 - `quick_comments.signs.enabled`: gutter signs for quick comments.
 - `export.context_lines`: lines of diff context included above and below each comment in the exported markdown.

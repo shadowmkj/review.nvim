@@ -372,6 +372,7 @@ file diffs longer than 1000 lines are elided in the preview.
     <CR>          Jump to the comment in the diff pane. On a directory in
                   tree view, collapse or expand it.
     d             Delete the comment. Confirms first.
+    s             Send all comments to `export.on_export` or herdr/tmux.
     t             Toggle flat and tree grouping.
     P             Push to remote.
     <C-d> / <C-u> Scroll the diff pane down / up.
@@ -432,6 +433,7 @@ need the keys you want to change. The complete defaults: >lua
             auto_enter = false,
         },
         quick_comments = {
+            target = nil,
             keymaps = {
                 add = nil,
                 toggle_panel = nil,
@@ -514,14 +516,20 @@ ui.panels ~
 tmux.target ~
     Where the export is pasted. The default "!" is tmux's last active pane,
     normally the pane you switched away from to reach Neovim, which is
-    usually the one running your agent. Any other target accepted by
-    `tmux paste-buffer -t` works, for example a named window "CLAUDE",
-    "CLAUDE.0" or a fully qualified "session:window.pane". |:Review| send and
-    |:Review| qs take a target for a single call.
+    usually the one running your agent. Named panes (by pane title, e.g. "agy"),
+    named windows (e.g. "agy" or "CLAUDE"), running commands, pane IDs ("%24"),
+    or fully qualified targets ("session:window.pane") are automatically
+    resolved and supported. |:Review| send and |:Review| qs take a target for
+    a single call.
 
 tmux.auto_enter ~
     Send Enter after pasting. Off by default so you can read the prompt
     before submitting it to the agent.
+
+quick_comments.target ~
+    Where quick comments exports are pasted in tmux. Unset by default (falls
+    back to `tmux.target`). Accepts pane titles, window names, command names,
+    or any tmux target.
 
 quick_comments.keymaps.add ~
 quick_comments.keymaps.toggle_panel ~

@@ -584,6 +584,14 @@ local function setup_keymaps(bufnr)
         M.refresh()
     end, { nowait = true, desc = "Toggle flat/tree" })
 
+    map("s", function()
+        if callbacks.on_send then
+            callbacks.on_send()
+        else
+            require("review.export.markdown").send()
+        end
+    end, { nowait = true, desc = "Send comments" })
+
     local panel_keymaps = require("review.ui.panel_keymaps")
     panel_keymaps.setup(bufnr, {
         panel_name = "comment_list",

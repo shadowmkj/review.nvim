@@ -147,4 +147,12 @@ T["setup warns when files panel disabled via map"] = function()
     expect.equality(captured[1].level, vim.log.levels.WARN)
 end
 
+T["quick_comments target configuration"] = function()
+    config.setup()
+    expect.equality(config.get().quick_comments.target, nil)
+
+    config.setup({ quick_comments = { target = "agy" } })
+    expect.equality(config.get().quick_comments.target, "agy")
+end
+
 return T

@@ -29,6 +29,7 @@
 ---@field auto_enter boolean Whether to send Enter key after pasting
 
 ---@class ReviewQuickCommentsConfig
+---@field target string|nil Target tmux window/pane for quick comments (falls back to tmux.target)
 ---@field keymaps ReviewQuickCommentsKeymaps
 ---@field panel ReviewQuickCommentsPanelConfig
 ---@field signs ReviewQuickCommentsSignsConfig
@@ -153,6 +154,7 @@ M.defaults = {
         auto_enter = false,
     },
     quick_comments = {
+        target = nil,
         keymaps = {
             add = nil,
             toggle_panel = nil,
